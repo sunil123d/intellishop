@@ -9,9 +9,23 @@ on:
 jobs:
 
 
-
   test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: intellishop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,10 +39,20 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Enable pgvector extension
+        env:
+          PGPASSWORD: postgres
+        run: |
+          sudo apt-get install -y postgresql-client
+          psql -h localhost -U postgres -d intellishop -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
       - name: Run tests
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/intellishop
         run: pytest tests/ -v
+
+
 
   build:
     needs: test
