@@ -1,26 +1,40 @@
 # tests/test_api.py
+import pytest
 from fastapi.testclient import TestClient
-from app.main import app
-from app.database import init_db
-
-# Ensure database tables exist before running any tests
-init_db()
-
-client = TestClient(app)
 
 
-def test_root_endpoint():
+@pytest.fixture(scope="session", autouse=True)
+def setup_database():
+    """
+    Runs ONCE before any test, guaranteed.
+    Explicitly creates tables and enables pgvector
+    extension before anything else touches the database.
+    """
+    from app.database import init_db
+    init_db()
+    yield
+
+
+@pytest.fixture(scope="session")
+def client(setup_database):
+    """Creates TestClient AFTER database is confirmed ready"""
+    from app.main import app
+    with TestClient(app) as c:
+        yield c
+
+
+def test_root_endpoint(client):
     response = client.get("/")
     assert response.status_code == 200
     assert response.json()["status"] == "running"
 
 
-def test_search_endpoint_validation():
+def test_search_endpoint_validation(client):
     response = client.post("/search", json={"query": ""})
     assert response.status_code == 422
 
 
-def test_search_endpoint_valid_request():
+def test_search_endpoint_valid_request(client):
     response = client.post("/search", json={
         "query": "running shoes",
         "top_k": 3
@@ -29,12 +43,9 @@ def test_search_endpoint_valid_request():
     data = response.json()
     assert "results" in data
     assert data["query"] == "running shoes"
-    # Note: results may be empty in CI since we don't seed data,
-    # that's fine — we're testing the endpoint WORKS, not that
-    # specific products exist
 
 
-def test_health_endpoint():
+def test_health_endpoint(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
