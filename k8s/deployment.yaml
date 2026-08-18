@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intellishop-api
+spec:
+  replicas: 2              # runs 2 copies for reliability
+  selector:
+    matchLabels:
+      app: intellishop-api
+  template:
+    metadata:
+      labels:
+        app: intellishop-api
+    spec:
+      containers:
+        - name: intellishop-api
+          image: intellishop-api:latest
+          imagePullPolicy: Never    # use local image (Minikube)
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://postgres:postgres@postgres-service:5432/intellishop"
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: intellishop-secrets
+                  key: groq-api-key
+          livenessProbe:            # Kubernetes checks app health
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:           # checks if ready for traffic
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
