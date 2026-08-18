@@ -1,6 +1,10 @@
 # tests/test_api.py
 from fastapi.testclient import TestClient
 from app.main import app
+from app.database import init_db
+
+# Ensure database tables exist before running any tests
+init_db()
 
 client = TestClient(app)
 
@@ -25,6 +29,9 @@ def test_search_endpoint_valid_request():
     data = response.json()
     assert "results" in data
     assert data["query"] == "running shoes"
+    # Note: results may be empty in CI since we don't seed data,
+    # that's fine — we're testing the endpoint WORKS, not that
+    # specific products exist
 
 
 def test_health_endpoint():
